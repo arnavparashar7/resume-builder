@@ -1,0 +1,177 @@
+// ============================================================================
+// Resume Builder - Prisma Schema
+// ----------------------------------------------------------------------------
+// Dev datasource is SQLite (zero-setup, file-based). Every field used here is
+// deliberately chosen to be SQLite/Postgres compatible:
+//   - Json fields work on both (SQLite stores as TEXT, Postgres as jsonb)
+//   - No native enums (SQLite has none) - plain String + a TS union type
+//     instead, validated at the application layer (see types/resume.ts)
+//   - cuid() ids work identically on both providers
+//
+// To move to Postgres later: change `provider` below to "postgresql", point
+// `url` at your Postgres instance, then run `npx prisma migrate dev`.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// ----------------------------------------------------------------------------
+// User - intentionally minimal today. Every owned record already carries a
+// userId so real auth (NextAuth, Clerk, etc.) can be dropped in later without
+// touching the schema: swap the hardcoded LOCAL_USER_ID (see lib/auth.ts) for
+// the real session user id.
+// ----------------------------------------------------------------------------
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String?
+  createdAt DateTime @default(now())
+  resumes   Resume[]
+}
+
+// ----------------------------------------------------------------------------
+// Resume - the top-level document. Holds NO presentation/layout information.
+// `templateId` only *selects* a template; it never configures one. Adding a
+// new template later never requires a migration.
+// ----------------------------------------------------------------------------
+model Resume {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title      String   @default("Untitled Resume") // dashboard display name, NOT part of resume content
+  templateId String   @default("classic")
+
+  personalInfo PersonalInfo?
+  sections     Section[]
+
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// PersonalInfo - one per resume. extraLinks is an open-ended Json array of
+// { label, url } so the user can attach arbitrary additional links without a
+// schema change.
+// ----------------------------------------------------------------------------
+model PersonalInfo {
+  id         String  @id @default(cuid())
+  resumeId   String  @unique
+  resume     Resume  @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  name       String  @default("")
+  email      String  @default("")
+  phone      String  @default("")
+  linkedin   String  @default("")
+  website    String  @default("")
+  extraLinks Json    @default("[]") // Array<{ label: string; url: string }>
+}
+
+// ----------------------------------------------------------------------------
+// Section - a named, orderable block on the resume (Education, Work
+// Experience, Skills, or any user-created custom section). `type` decides
+// which child records are meaningful:
+//
+//   EDUCATION -> educationEntries
+//   ENTRIES   -> entries (experience / projects / positions / awards / etc.)
+//   RICHTEXT  -> richContent (freeform text block, e.g. Skills / Summary)
+//
+// This is the mechanism that satisfies "users can add custom sections" -
+// a new section is just a new Section row with a chosen type; nothing about
+// the schema or the editor needs to change.
+// ----------------------------------------------------------------------------
+model Section {
+  id       String  @id @default(cuid())
+  resumeId String
+  resume   Resume  @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  title    String                // display name, fully user-editable
+  type     String                // "EDUCATION" | "ENTRIES" | "RICHTEXT" (see types/resume.ts SectionType)
+  order    Int     @default(0)
+  isVisible Boolean @default(true)
+
+  richContent Json?              // Tiptap JSON doc, only used when type === "RICHTEXT"
+
+  educationEntries EducationEntry[]
+  entries          Entry[]
+
+  @@index([resumeId])
+}
+
+// ----------------------------------------------------------------------------
+// EducationEntry - structured fields matching the reference resume's table
+// (degree, field, institution, date, grade) plus an optional rich description.
+// ----------------------------------------------------------------------------
+model EducationEntry {
+  id        String  @id @default(cuid())
+  sectionId String
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  order       Int    @default(0)
+  degree      String @default("")
+  field       String @default("")
+  institution String @default("")
+  dateLabel   String @default("") // freeform: "2023", "Present", "2020 - 2024"
+  grade       String @default("")
+  description Json?               // optional Tiptap JSON doc
+
+  @@index([sectionId])
+}
+
+// ----------------------------------------------------------------------------
+// Entry - the generic "bulleted block" shape used by Experience, Projects,
+// Positions of Responsibility, Extra-curriculars, Awards, and any future
+// custom ENTRIES section. Dates are freeform (dateLabel) to match resumes
+// like the reference ("Jan'24-Present") without forcing calendar-date UX,
+// while still keeping isCurrent for "Present" badges/sorting if ever needed.
+// ----------------------------------------------------------------------------
+model Entry {
+  id        String  @id @default(cuid())
+  sectionId String
+  section   Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  order       Int      @default(0)
+  title       String   @default("")  // e.g. "Live Project: Project Minties"
+  subtitle    String   @default("")  // e.g. company / organization / role qualifier
+  location    String   @default("")
+
+  startDate   String   @default("")  // ISO date string or empty
+  endDate     String   @default("")
+  isCurrent   Boolean  @default(false)
+  dateLabel   String   @default("")  // freeform override, e.g. "(Jan'24-Present)"; wins over start/end if set
+
+  description Json?                  // optional Tiptap JSON doc (intro paragraph above bullets)
+
+  bullets     Bullet[]
+
+  @@index([sectionId])
+}
+
+// ----------------------------------------------------------------------------
+// Bullet - supports one level of nesting via parentId (matches the reference
+// resume's two-level bullet structure). content is Tiptap JSON so bold/
+// italic/links inside a bullet are preserved structurally, not as HTML.
+// ----------------------------------------------------------------------------
+model Bullet {
+  id       String  @id @default(cuid())
+  entryId  String
+  entry    Entry   @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  parentId String? // self-relation for one level of nesting
+  parent   Bullet?  @relation("BulletChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children Bullet[] @relation("BulletChildren")
+
+  order    Int    @default(0)
+  content  Json   // Tiptap JSON doc for this bullet's text
+
+  @@index([entryId])
+  @@index([parentId])
+}

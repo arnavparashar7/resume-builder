@@ -1,0 +1,169 @@
+/* ============================================================================
+ * Classic template styles
+ * ----------------------------------------------------------------------------
+ * Modeled closely on the reference resume (ResumeOLD.pdf): a single serif
+ * typeface throughout, a centered bold name with a rule beneath it, gray
+ * section header bars, a bordered education table, and right-aligned dates
+ * on bulleted entries with one level of nested sub-bullets.
+ *
+ * Sizes are in pt rather than Tailwind's rem scale because this page is
+ * designed to be printed at true A4 dimensions (see .classic-page) - pt
+ * keeps the on-screen preview and the Playwright-rendered PDF (Checkpoint 5)
+ * visually identical without unit conversion surprises.
+ * ============================================================================ */
+
+.classic-page {
+  width: 210mm;
+  /* NOTE: no min-height here - see the @media screen block below for why. */
+  /* Only left/right padding lives here - it's a single continuous block, so
+     horizontal padding naturally appears on every printed page. Top/bottom
+     margin CANNOT work the same way: it would only apply once at the very
+     start and end of the whole flow, not at each page-break. Vertical
+     margin is instead supplied per-page by Playwright's page.pdf({ margin })
+     call (see lib/pdf/generateResumePdf.ts), which repeats correctly on
+     every page. The @media screen rule below re-adds vertical padding ONLY
+     for the on-screen live preview, so a single, unpaginated page still
+     looks properly margined there. */
+  padding: 0 16mm;
+  background: #ffffff;
+  color: #1a1a1a;
+  font-family: Georgia, "Times New Roman", Cambria, serif;
+  font-size: 10.5pt;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+@media screen {
+  .classic-page {
+    /* min-height is screen-only too: it makes a short resume still fill an
+       A4-shaped page in the live preview. In print, Playwright's own
+       `format: "A4"` + `margin` (see lib/pdf/generateResumePdf.ts) already
+       determines each page's real printable height - forcing an ADDITIONAL
+       297mm-tall content box on top of that would exceed what's left after
+       the 14mm+14mm margins are subtracted, pushing a mostly-empty resume
+       into an unwanted, entirely blank trailing page. Print only ever needs
+       the box tall enough for its actual content, so page.pdf() can size
+       pages correctly on its own. */
+    min-height: 297mm;
+    padding-top: 14mm;
+    padding-bottom: 14mm;
+  }
+}
+
+@page {
+  size: A4;
+}
+
+.classic-name {
+  text-align: center;
+  font-size: 19pt;
+  font-weight: 700;
+  margin: 0 0 3pt 0;
+  letter-spacing: 0.2pt;
+}
+
+.classic-rule {
+  border: none;
+  border-top: 1.4pt solid #1a1a1a;
+  margin: 0 0 5pt 0;
+}
+
+.classic-contact {
+  text-align: center;
+  font-size: 9.5pt;
+  margin: 0 0 11pt 0;
+}
+
+.classic-contact a {
+  color: #1a1a1a;
+  text-decoration: underline;
+}
+
+.classic-section {
+  margin-bottom: 8pt;
+}
+
+.classic-section-header {
+  background: #d9d9d9;
+  font-weight: 700;
+  font-size: 10pt;
+  text-transform: uppercase;
+  letter-spacing: 0.2pt;
+  padding: 2.5pt 7pt;
+  margin-bottom: 4pt;
+}
+
+.classic-edu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+  margin-bottom: 2pt;
+}
+
+.classic-edu-table td {
+  border: 1pt solid #1a1a1a;
+  padding: 3pt 7pt;
+  vertical-align: top;
+}
+
+.classic-entries {
+  list-style: disc;
+  margin: 0;
+  padding-left: 14pt;
+}
+
+.classic-entries > li {
+  margin-bottom: 3pt;
+}
+
+.classic-entries ul {
+  list-style: disc;
+  margin: 1pt 0 0 0;
+  padding-left: 14pt;
+}
+
+.classic-entries li {
+  margin-bottom: 1.5pt;
+}
+
+.classic-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10pt;
+}
+
+.classic-entry-date {
+  white-space: nowrap;
+  font-size: 9.5pt;
+  flex-shrink: 0;
+}
+
+.classic-entry-description {
+  margin-top: 1pt;
+}
+
+.classic-richtext ul,
+.classic-richtext ol {
+  padding-left: 14pt;
+  margin: 0;
+}
+
+.classic-richtext p {
+  margin: 0 0 2pt 0;
+}
+
+.classic-richtext p:empty {
+  min-height: 1em;
+}
+
+/* Print-specific: avoid splitting a section header from its content, or an
+   entry's header from its own bullets, across a page break. */
+@media print {
+  .classic-section {
+    break-inside: avoid;
+  }
+  .classic-entries > li {
+    break-inside: avoid;
+  }
+}

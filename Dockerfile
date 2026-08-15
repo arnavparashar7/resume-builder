@@ -1,28 +1,23 @@
-FROM mcr.microsoft.com/playwright:v1.49.0-noble
+FROM node:24-alpine
 
 WORKDIR /app
 
-# Install dependencies first (for layer caching)
 COPY package*.json ./
+
 RUN npm ci
 
-# Copy the rest of the application files
 COPY . .
 
-# Generate Prisma client and build Next.js application
 RUN npx prisma generate
+
 RUN npm run build
 
-# Expose Next.js server port
 EXPOSE 3000
+
 ENV PORT=3000
 ENV NODE_ENV=production
+ENV DATABASE_URL=file:/data/dev.db
 
-# Database path (point to the persistent mount path)
-ENV DATABASE_URL="file:/data/dev.db"
-
-# Create directory for persistent SQLite data
 RUN mkdir -p /data
 
-# Run database schema push on launch, then start Next.js
 CMD npx prisma db push && npm run start

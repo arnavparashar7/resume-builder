@@ -3,7 +3,6 @@ FROM node:22-bookworm
 WORKDIR /app
 
 ENV PORT=3000
-ENV NODE_ENV=production
 ENV DATABASE_URL="file:/data/dev.db"
 
 COPY package*.json ./
@@ -21,5 +20,7 @@ RUN npm run build
 EXPOSE 3000
 
 RUN mkdir -p /data
+
+ENV NODE_ENV=production
 
 CMD npx prisma db push && npm run start

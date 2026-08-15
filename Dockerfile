@@ -1,5 +1,4 @@
-# Production Dockerfile for Next.js, SQLite, and Playwright
-FROM mcr.microsoft.com/playwright:v1.44.0-jammy
+FROM mcr.microsoft.com/playwright:v1.49.0-noble
 
 WORKDIR /app
 

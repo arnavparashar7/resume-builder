@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUserId } from "@/lib/auth";
 import { prisma } from "@/lib/db/prisma";
 import { generateResumePdf } from "@/lib/pdf/generateResumePdf";
+import crypto from "crypto";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -15,7 +16,13 @@ export async function GET(req: NextRequest, { params }: Params) {
   // Same-origin URL to this app's own /print/[id] route - see
   // lib/pdf/generateResumePdf.ts for why PDF generation is "screenshot our
   // own preview route" rather than a separate rendering path.
-  const printUrl = new URL(`/print/${id}`, req.nextUrl.origin).toString();
+  // We append a secure token so that the server-side print page can authenticate
+  // the PDF engine request.
+  const token = crypto
+    .createHmac("sha256", process.env.AUTH_SECRET || "")
+    .update(id)
+    .digest("hex");
+  const printUrl = new URL(`/print/${id}?token=${token}`, req.nextUrl.origin).toString();
 
   let pdfBuffer: Buffer;
   try {

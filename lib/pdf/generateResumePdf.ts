@@ -16,7 +16,9 @@ import { chromium } from "playwright";
 // ============================================================================
 
 export async function generateResumePdf(printUrl: string): Promise<Buffer> {
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+  });
   try {
     const page = await browser.newPage();
     await page.goto(printUrl, { waitUntil: "networkidle" });
